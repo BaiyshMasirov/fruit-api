@@ -1,3 +1,4 @@
+using Scalar.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using fruit_api.Data;
@@ -40,9 +41,10 @@ using (var scope = app.Services.CreateScope())
     await scope.ServiceProvider.GetRequiredService<FruitDb>().Database.MigrateAsync();
 
 app.MapMethods("/", ["GET", "HEAD"], () => Results.Ok());
-if (app.Environment.IsDevelopment())
-    app.MapOpenApi();
+app.MapOpenApi();
+app.MapScalarApiReference();
 app.MapControllers();
 await app.RunAsync();
+
 
 
