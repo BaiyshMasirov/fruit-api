@@ -7,6 +7,16 @@
 body{font:16px system-ui;max-width:64rem;margin:3rem auto;padding:0 1rem;background:#f5f7f1;color:#192819}
 input,select,textarea,button{font:inherit;padding:.5rem;margin:.2rem}textarea{display:block;width:95%;font:14px monospace}
 button{cursor:pointer}fieldset{border:1px solid #bac8b6}label{display:inline-block}#message{white-space:pre-wrap}
+[hidden]{display:none!important}
+body{max-width:76rem;background:#f4f7f3;color:#172b22}
+h1{letter-spacing:-.04em} button{border:1px solid #c8d9ce;border-radius:8px;background:white;color:inherit}
+.primary{background:#176344;color:white;border-color:#176344}
+section,fieldset,dialog,#login{background:white;border:1px solid #dce6df;border-radius:14px;padding:1.25rem;margin:1rem 0}
+table{width:100%;border-collapse:collapse;text-align:left}th,td{padding:.7rem;border-bottom:1px solid #e4ece6}
+.toolbar,.fields{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}.toolbar h2{margin-right:auto}
+.fields label{display:grid;flex:1 1 12rem}.fields input,.fields select{min-width:0}
+dialog{width:min(40rem,85vw);margin:auto}dialog::backdrop{background:#172b2277}
+.scroll{overflow:auto}
 </style>
 <h1>Fruit · Управление витриной</h1>
 <form id="login">
@@ -15,6 +25,29 @@ button{cursor:pointer}fieldset{border:1px solid #bac8b6}label{display:inline-blo
 <button>Войти</button>
 </form>
 <p id="message" role="status"></p>
+<section id="products" hidden>
+<div class="toolbar"><h2>Товары</h2><input id="search" placeholder="Поиск по названию" aria-label="Поиск товаров"><button id="addProduct" class="primary">+ Добавить товар</button><button id="settings">Другие разделы</button><button id="signOut">Выйти</button></div>
+<div class="scroll"><table><thead><tr><th>Название</th><th>Категория</th><th>Цена</th><th>Наличие</th><th></th></tr></thead><tbody id="productRows"></tbody></table></div>
+</section>
+<dialog id="productDialog">
+<form id="productForm">
+<h2 id="productTitle">Товар</h2>
+<div class="fields">
+<label>Название<input name="name" required></label>
+<label>Сорт<input name="variety"></label>
+<label>Категории<select name="categories" multiple required></select></label>
+<label>Единица продажи<select name="unit"></select></label>
+<label>Цена, сом<input name="price" type="number" min="0" required></label>
+<label>Старая цена, сом<input name="oldPrice" type="number" min="1"></label>
+<label>Шаг количества<input name="step" type="number" min="1" required></label>
+<label>Максимум<input name="max" type="number" min="1" required></label>
+<label>Ссылка на фото<input name="imageUrl" type="url"></label>
+</div>
+<p><label><input name="available" type="checkbox"> В наличии</label> <label><input name="season" type="checkbox"> Сезонный</label></p>
+<p id="formError" role="alert"></p>
+<button id="saveProduct" class="primary">Сохранить</button><button type="button" id="cancelProduct">Отмена</button>
+</form>
+</dialog>
 <fieldset id="editor" hidden>
 <legend>Данные витрины</legend>
 <label>Запись <select id="records"></select></label>
@@ -24,7 +57,7 @@ button{cursor:pointer}fieldset{border:1px solid #bac8b6}label{display:inline-blo
 <label>Тип <select id="kind"><option>singleton</option><option>news</option><option>text</option></select></label>
 <label>ID <input id="recordId"></label>
 <p>В записи catalog массив products содержит товары, categories — категории, sets — наборы.</p>
-<button id="newProduct">Добавить товар</button>
+
 <textarea id="payload" rows="24" aria-label="Данные записи JSON"></textarea>
 <button id="save">Сохранить</button>
 <button id="remove">Удалить новость или текст</button>
@@ -61,36 +94,106 @@ get('login').onsubmit = async event => {
         await load('singleton/catalog');
         get('password').value = '';
         get('login').hidden = true;
-        get('editor').hidden = false;
+        get('products').hidden = false;
+        renderProducts();
         show('');
     } catch (error) { authorization = ''; show(error.message); }
 };
 get('logout').onclick = () => location.reload();
 get('records').onchange = event => select(event.target.value);
 get('newRecord').onclick = () => select(-1);
-get('newProduct').onclick = () => {
-    try {
-        if (get('kind').value !== 'singleton' || get('recordId').value !== 'catalog') {
-            const index = records.findIndex(row => row.kind === 'singleton' && row.id === 'catalog');
-            get('records').value = index;
-            select(index);
+const units = { kg: 'кг', piece: 'шт', tray: 'лоток', box: 'ящик', bag: 'мешок' };
+const form = get('productForm');
+const catalog = () => records.find(row => row.kind === 'singleton' && row.id === 'catalog').payload;
+let selectedProduct = null;
+function renderProducts() {
+    const { products, categories } = catalog();
+    const search = get('search').value.trim().toLocaleLowerCase('ru');
+    const rows = products.filter(product =>
+        [product.name, product.variety, product.id].join(' ').toLocaleLowerCase('ru').includes(search));
+    get('productRows').replaceChildren(...rows.map(product => {
+        const row = document.createElement('tr');
+        const names = categories.filter(category => product.categoryIds.includes(category.id)).map(category => category.name);
+        for (const value of [[product.name, product.variety].filter(Boolean).join(' · '), names.join(', '),
+            product.price + ' сом / ' + product.unitTitle, product.available ? 'В наличии' : 'Закончилось']) {
+            row.insertCell().textContent = value;
         }
-        const data = JSON.parse(get('payload').value);
-        const id = prompt('ID товара, например p_orange');
-        if (!id) return;
-        if (data.products.some(product => product.id === id)) throw Error('Этот ID уже используется.');
-        const name = prompt('Название товара');
-        if (!name) return;
-        data.products.push({
-            id, name, variety: null, categoryIds: data.categories.filter(category => category.type === 'products').slice(0, 1).map(category => category.id),
-            sortOrder: 10, imageUrl: null, unit: 'kg', unitTitle: 'кг', price: 0, oldPrice: null,
-            step: 500, max: 10000, approxPiecesPerKg: null, weight: null, season: false, badges: [],
-            available: false, closedOn: [], boxProductId: null, searchWords: [], description: null
-        });
-        get('payload').value = JSON.stringify(data, null, 2);
-        show('Укажите цену, категорию и наличие, затем сохраните каталог.');
-    } catch (error) { show(error.message); }
+        const button = document.createElement('button');
+        button.textContent = 'Редактировать';
+        button.onclick = () => openProduct(product);
+        row.insertCell().append(button);
+        return row;
+    }));
+}
+function openProduct(product = null) {
+    selectedProduct = product;
+    form.reset();
+    get('formError').textContent = '';
+    get('productTitle').textContent = product ? 'Редактировать товар' : 'Новый товар';
+    const fields = form.elements;
+    fields.categories.replaceChildren(...catalog().categories.filter(category => category.type === 'products' &&
+        !catalog().categories.some(child => child.parentId === category.id)).map(category =>
+        new Option(category.name, category.id, false, product?.categoryIds.includes(category.id))));
+    const choices = product ? { [product.unit]: product.unitTitle } : units;
+    fields.unit.replaceChildren(...Object.entries(choices).map(([value, label]) => new Option(label, value)));
+    for (const key of ['name', 'variety', 'price', 'oldPrice', 'imageUrl']) fields[key].value = product?.[key] ?? '';
+    fields.step.value = product?.step ?? 500;
+    fields.max.value = product?.max ?? 10000;
+    fields.available.checked = product?.available ?? true;
+    fields.season.checked = product?.season ?? false;
+    get('productDialog').showModal();
+}
+form.elements.unit.onchange = () => {
+    const byWeight = form.elements.unit.value === 'kg';
+    form.elements.step.value = byWeight ? 500 : 1;
+    form.elements.max.value = byWeight ? 10000 : 20;
 };
+form.onsubmit = async event => {
+    event.preventDefault();
+    const fields = form.elements;
+    const button = get('saveProduct');
+    button.disabled = true;
+    get('cancelProduct').disabled = true;
+    try {
+        const step = Number(fields.step.value);
+        const max = Number(fields.max.value);
+        const price = Number(fields.price.value);
+        const oldPrice = fields.oldPrice.value ? Number(fields.oldPrice.value) : null;
+        if (max % step !== 0) throw Error('Максимум должен быть кратен шагу.');
+        if (oldPrice !== null && oldPrice <= price) throw Error('Старая цена должна быть выше текущей.');
+        if (!fields.name.value.trim()) throw Error('Введите название товара.');
+        const data = structuredClone(catalog());
+        const product = {
+            ...(selectedProduct ?? { id: 'p_' + crypto.randomUUID(), sortOrder: 10, approxPiecesPerKg: null,
+                weight: null, badges: [], closedOn: [], boxProductId: null, searchWords: [], description: null }),
+            name: fields.name.value.trim(), variety: fields.variety.value.trim() || null,
+            categoryIds: Array.from(fields.categories.selectedOptions, option => option.value),
+            imageUrl: fields.imageUrl.value.trim() || null, unit: fields.unit.value,
+            unitTitle: fields.unit.selectedOptions[0].text, price, oldPrice, step, max,
+            available: fields.available.checked, season: fields.season.checked
+        };
+        const index = data.products.findIndex(item => item.id === product.id);
+        if (index < 0) data.products.push(product);
+        else data.products[index] = product;
+        await request('/singleton/catalog', { method: 'PUT', body: JSON.stringify(data) });
+        await load('singleton/catalog');
+        renderProducts();
+        get('productDialog').close();
+        show('Товар сохранён.');
+    } catch (error) { get('formError').textContent = error.message; }
+    finally {
+        button.disabled = false;
+        get('cancelProduct').disabled = false;
+    }
+};
+get('productDialog').oncancel = event => {
+    if (get('saveProduct').disabled) event.preventDefault();
+};
+get('cancelProduct').onclick = () => get('productDialog').close();
+get('addProduct').onclick = () => openProduct();
+get('search').oninput = renderProducts;
+get('signOut').onclick = () => location.reload();
+get('settings').onclick = () => { get('editor').hidden = !get('editor').hidden; };
 async function edit(method) {
     try {
         const kind = get('kind').value;
@@ -107,3 +210,4 @@ get('save').onclick = () => edit('PUT');
 get('remove').onclick = () => edit('DELETE');
 </script>
 </html>
+
