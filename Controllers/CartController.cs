@@ -54,12 +54,12 @@ public sealed class CartController(IStorefront storefront) : ControllerBase
                 product = new
                 {
                     productId = id,
-                    name = product.GetProperty("name"),
-                    variety = product.GetProperty("variety"),
-                    imageUrl = product.GetProperty("imageUrl"),
+                    name = product.GetProperty("name").GetString(),
+                    variety = product.GetProperty("variety").GetString(),
+                    imageUrl = product.GetProperty("imageUrl").GetString(),
                     unit,
-                    unitTitle = product.GetProperty("unitTitle"),
-                    weight = product.GetProperty("weight")
+                    unitTitle = product.GetProperty("unitTitle").GetString(),
+                    weight = product.GetProperty("weight").Clone()
                 },
                 quantity, price, line.AddedPrice, sum,
                 status = available ? "ok" : "out_of_stock",
@@ -84,3 +84,4 @@ public sealed class CartController(IStorefront storefront) : ControllerBase
     public sealed record CartInput(DateOnly? Date, IReadOnlyList<CartLine?>? Lines);
     public sealed record CartLine(string? ProductId, int Quantity, int AddedPrice);
 }
+
