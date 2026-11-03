@@ -1,5 +1,6 @@
 services:
   api:
+    networks: [default, https_proxy]
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -16,3 +17,8 @@ services:
   redis:
     restart: unless-stopped
 
+
+networks:
+  https_proxy:
+    external: true
+    name: crypto-radar-promo_default
