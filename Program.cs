@@ -1,0 +1,48 @@
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using fruit_api.Data;
+using fruit_api.Application;
+using fruit_api.Infrastructure;
+using fruit_api.Features;
+
+var builder = WebApplication.CreateBuilder(args);
+var postgres = builder.Configuration.GetConnectionString("Postgres")
+    ?? throw new InvalidOperationException("ConnectionStrings:Postgres is required.");
+builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(postgres));
+builder.Services.AddDbContext<FruitDb>((services, options) =>
+    options.UseNpgsql(services.GetRequiredService<NpgsqlDataSource>()));
+builder.Services.AddStackExchangeRedisCache(options =>
+    options.Configuration = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379");
+builder.Services.AddScoped<IStorefront, Storefront>();
+builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
+    options.InvalidModelStateResponseFactory = _ =>
+        Responses.Error(400, "validation", "Не удалось обработать запрос"));
+builder.Services.AddOpenApi();
+
+var app = builder.Build();
+app.UseExceptionHandler(error => error.Run(async context =>
+    await Responses.Error(500, "server_error", "Ошибка сервера. Попробуйте позже.").ExecuteResultAsync(new Microsoft.AspNetCore.Mvc.ActionContext { HttpContext = context })));
+app.UseStatusCodePages(async status =>
+{
+    var context = status.HttpContext;
+    var code = context.Response.StatusCode;
+    await Responses.Error(code, code == 404 ? "not_found" : "validation",
+        code == 404 ? "Не найдено" : "Не удалось обработать запрос").ExecuteResultAsync(new Microsoft.AspNetCore.Mvc.ActionContext { HttpContext = context });
+});
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/api/v1"))
+        context.Response.Headers.CacheControl = "no-store";
+    await next();
+});
+
+using (var scope = app.Services.CreateScope())
+    await scope.ServiceProvider.GetRequiredService<FruitDb>().Database.MigrateAsync();
+
+app.MapMethods("/", ["GET", "HEAD"], () => Results.Ok());
+if (app.Environment.IsDevelopment())
+    app.MapOpenApi();
+app.MapControllers();
+await app.RunAsync();
+
+

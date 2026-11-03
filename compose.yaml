@@ -1,0 +1,36 @@
+services:
+  api:
+    build: .
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Postgres: Host=postgres;Database=fruit;Username=fruit;Password=fruit_local
+      ConnectionStrings__Redis: redis:6379,abortConnect=false,connectTimeout=1500
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: fruit
+      POSTGRES_USER: fruit
+      POSTGRES_PASSWORD: fruit_local
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "fruit", "-d", "fruit"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+volumes:
+  postgres_data:
