@@ -21,6 +21,21 @@ builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/admin"))
+    {
+        var adminPort = app.Configuration.GetValue("Admin:Port", 8082);
+        if (context.Connection.LocalPort != adminPort)
+        {
+            context.Response.StatusCode = 404;
+            return;
+        }
+        context.Response.Headers.CacheControl = "no-store";
+    }
+    await next();
+});
+app.UseStaticFiles();
 app.UseExceptionHandler(error => error.Run(async context =>
     await Responses.Error(500, "server_error", "Ошибка сервера. Попробуйте позже.").ExecuteResultAsync(new Microsoft.AspNetCore.Mvc.ActionContext { HttpContext = context })));
 app.UseStatusCodePages(async status =>
@@ -43,8 +58,10 @@ using (var scope = app.Services.CreateScope())
 app.MapMethods("/", ["GET", "HEAD"], () => Results.Ok());
 app.MapOpenApi();
 app.MapScalarApiReference();
+app.MapGet("/admin", () => Results.Redirect("/admin/index.html"));
 app.MapControllers();
 await app.RunAsync();
+
 
 
 

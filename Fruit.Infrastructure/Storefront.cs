@@ -10,6 +10,8 @@ namespace fruit_api.Infrastructure;
 
 public sealed class Storefront(NpgsqlDataSource source, IDistributedCache cache, ILogger<Storefront> logger) : IStorefront
 {
+    public const string CacheKey = "fruit:v1:catalog";
+
     public async Task<string?> Read(string kind, string id, CancellationToken token)
     {
         await using var connection = await source.OpenConnectionAsync(token);
@@ -20,10 +22,10 @@ public sealed class Storefront(NpgsqlDataSource source, IDistributedCache cache,
 
     public async Task<string> ReadCatalog(CancellationToken token)
     {
-        const string key = "fruit:v1:catalog";
+
         try
         {
-            var cached = await cache.GetStringAsync(key, token);
+            var cached = await cache.GetStringAsync(CacheKey, token);
             if (cached is not null)
                 return cached;
         }
@@ -36,7 +38,7 @@ public sealed class Storefront(NpgsqlDataSource source, IDistributedCache cache,
             ?? throw new InvalidOperationException("Catalog is missing.");
         try
         {
-            await cache.SetStringAsync(key, catalog,
+            await cache.SetStringAsync(CacheKey, catalog,
                 new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30) },
                 token);
         }
@@ -71,5 +73,6 @@ public sealed class Storefront(NpgsqlDataSource source, IDistributedCache cache,
         return document.RootElement.Clone();
     }
 }
+
 
 

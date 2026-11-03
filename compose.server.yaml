@@ -3,12 +3,16 @@ services:
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080;8082"
+      Admin__Password: ${FRUIT_ADMIN_PASSWORD:-}
       ConnectionStrings__Postgres: Host=postgres;Database=fruit;Username=fruit;Password=${FRUIT_DB_PASSWORD:?Set FRUIT_DB_PASSWORD}
     ports: !override
       - "8081:8080"
+      - "127.0.0.1:8082:8082"
   postgres:
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${FRUIT_DB_PASSWORD:?Set FRUIT_DB_PASSWORD}
   redis:
     restart: unless-stopped
+

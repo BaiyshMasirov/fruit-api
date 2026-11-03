@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fruit · Админка</title>
+<style>
+body{font:16px system-ui;max-width:64rem;margin:3rem auto;padding:0 1rem;background:#f5f7f1;color:#192819}
+input,select,textarea,button{font:inherit;padding:.5rem;margin:.2rem}textarea{display:block;width:95%;font:14px monospace}
+button{cursor:pointer}fieldset{border:1px solid #bac8b6}label{display:inline-block}#message{white-space:pre-wrap}
+</style>
+<h1>Fruit · Управление витриной</h1>
+<form id="login">
+<label>Логин <input id="username" autocomplete="username" value="admin" required></label>
+<label>Пароль <input id="password" type="password" autocomplete="current-password" required></label>
+<button>Войти</button>
+</form>
+<p id="message" role="status"></p>
+<fieldset id="editor" hidden>
+<legend>Данные витрины</legend>
+<label>Запись <select id="records"></select></label>
+<button id="newRecord">Новая запись</button>
+<button id="logout">Выйти</button>
+<br>
+<label>Тип <select id="kind"><option>singleton</option><option>news</option><option>text</option></select></label>
+<label>ID <input id="recordId"></label>
+<p>В записи catalog массив products содержит товары, categories — категории, sets — наборы.</p>
+<button id="newProduct">Добавить товар</button>
+<textarea id="payload" rows="24" aria-label="Данные записи JSON"></textarea>
+<button id="save">Сохранить</button>
+<button id="remove">Удалить новость или текст</button>
+</fieldset>
+<script>
+const get = id => document.getElementById(id);
+let authorization = '', records = [];
+function show(text) { get('message').textContent = text; }
+async function request(path = '', options = {}) {
+    const response = await fetch('/admin/data' + path, {
+        ...options, headers: { Authorization: authorization, 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) throw Error(response.status === 401 ? 'Неверный логин или пароль.' : await response.text());
+    return response.status === 204 ? null : response.json();
+}
+function select(index) {
+    const row = records[index];
+    get('kind').value = row?.kind ?? 'news';
+    get('recordId').value = row?.id ?? '';
+    get('payload').value = JSON.stringify(row?.payload ?? {}, null, 2);
+}
+async function load(key) {
+    records = await request();
+    get('records').replaceChildren(...records.map((row, index) =>
+        new Option(row.kind + ' / ' + row.id, index)));
+    const index = Math.max(0, records.findIndex(row => row.kind + '/' + row.id === key));
+    get('records').value = index;
+    select(index);
+}
+get('login').onsubmit = async event => {
+    event.preventDefault();
+    try {
+        authorization = 'Basic ' + btoa(get('username').value + ':' + get('password').value);
+        await load('singleton/catalog');
+        get('password').value = '';
+        get('login').hidden = true;
+        get('editor').hidden = false;
+        show('');
+    } catch (error) { authorization = ''; show(error.message); }
+};
+get('logout').onclick = () => location.reload();
+get('records').onchange = event => select(event.target.value);
+get('newRecord').onclick = () => select(-1);
+get('newProduct').onclick = () => {
+    try {
+        if (get('kind').value !== 'singleton' || get('recordId').value !== 'catalog') {
+            const index = records.findIndex(row => row.kind === 'singleton' && row.id === 'catalog');
+            get('records').value = index;
+            select(index);
+        }
+        const data = JSON.parse(get('payload').value);
+        const id = prompt('ID товара, например p_orange');
+        if (!id) return;
+        if (data.products.some(product => product.id === id)) throw Error('Этот ID уже используется.');
+        const name = prompt('Название товара');
+        if (!name) return;
+        data.products.push({
+            id, name, variety: null, categoryIds: data.categories.filter(category => category.type === 'products').slice(0, 1).map(category => category.id),
+            sortOrder: 10, imageUrl: null, unit: 'kg', unitTitle: 'кг', price: 0, oldPrice: null,
+            step: 500, max: 10000, approxPiecesPerKg: null, weight: null, season: false, badges: [],
+            available: false, closedOn: [], boxProductId: null, searchWords: [], description: null
+        });
+        get('payload').value = JSON.stringify(data, null, 2);
+        show('Укажите цену, категорию и наличие, затем сохраните каталог.');
+    } catch (error) { show(error.message); }
+};
+async function edit(method) {
+    try {
+        const kind = get('kind').value;
+        const id = get('recordId').value.trim();
+        if (!id) throw Error('Укажите ID.');
+        if (method === 'DELETE' && !confirm('Удалить ' + id + '?')) return;
+        const body = method === 'PUT' ? JSON.stringify(JSON.parse(get('payload').value)) : undefined;
+        await request('/' + kind + '/' + encodeURIComponent(id), { method, body });
+        await load(kind + '/' + id);
+        show(method === 'PUT' ? 'Сохранено.' : 'Удалено.');
+    } catch (error) { show(error.message); }
+}
+get('save').onclick = () => edit('PUT');
+get('remove').onclick = () => edit('DELETE');
+</script>
+</html>
