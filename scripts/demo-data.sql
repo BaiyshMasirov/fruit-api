@@ -1,41 +1,606 @@
 \set ON_ERROR_STOP on
+-- Catalog fixture from backend_handoff_2026-10-21.zip, api_model/model.py::seed_catalog.
 BEGIN;
-
-WITH products(id, name, variety, category, sort, price, old_price, available, pieces) AS (
-    VALUES
-        ('p_demo_apple', 'Яблоки', 'Голден', 'c_demo_fruit', 10, 105, 120, true, 5),
-        ('p_demo_pear', 'Груши', 'Конференция', 'c_demo_fruit', 20, 180, NULL, true, 6),
-        ('p_demo_persimmon', 'Хурма', 'Королёк', 'c_demo_fruit', 30, 160, 195, true, 5),
-        ('p_demo_grape', 'Виноград', 'Кишмиш', 'c_demo_berry', 40, 220, NULL, true, NULL),
-        ('p_demo_pomegranate', 'Гранаты', NULL, 'c_demo_fruit', 50, 240, NULL, true, 3),
-        ('p_demo_blueberry', 'Голубика', NULL, 'c_demo_berry', 60, 840, NULL, false, NULL)
-), catalog AS (
-    SELECT jsonb_build_object(
-        'categories', '[
-          {"id":"c_demo_fruit","name":"Фрукты","type":"products","parentId":null,"imageUrl":null,"sortOrder":1},
-          {"id":"c_demo_berry","name":"Ягоды и виноград","type":"products","parentId":null,"imageUrl":null,"sortOrder":2},
-          {"id":"c_demo_sets","name":"Наборы","type":"sets","parentId":null,"imageUrl":null,"sortOrder":3}
-        ]'::jsonb,
-        'products', jsonb_agg(jsonb_build_object(
-            'id', id, 'name', name, 'variety', variety, 'categoryIds', jsonb_build_array(category),
-            'sortOrder', sort, 'imageUrl', NULL, 'unit', 'kg', 'unitTitle', 'кг', 'price', price,
-            'oldPrice', old_price, 'step', 500, 'max', 10000, 'approxPiecesPerKg', pieces,
-            'weight', NULL, 'season', available, 'badges', '[]'::jsonb, 'available', available,
-            'closedOn', '[]'::jsonb, 'boxProductId', NULL, 'searchWords', '[]'::jsonb,
-            'description', NULL) ORDER BY sort),
-        'sets', '[
-          {"id":"s_demo_weekend","name":"Фрукты на выходные","purpose":"Яблоки, груши и виноград","imageUrl":null,
-           "items":[{"productId":"p_demo_apple","quantity":1000},{"productId":"p_demo_pear","quantity":1000},
-                    {"productId":"p_demo_grape","quantity":500}]},
-          {"id":"s_demo_autumn","name":"Осенний набор","purpose":"Хурма и гранаты","imageUrl":null,
-           "items":[{"productId":"p_demo_persimmon","quantity":1000},{"productId":"p_demo_pomegranate","quantity":500}]}
-        ]'::jsonb) AS payload
-    FROM products
-)
-UPDATE storefront_content SET payload = catalog.payload FROM catalog
+UPDATE storefront_content SET payload = $catalog$
+{
+  "categories": [
+    {
+      "id": "c_fruit",
+      "name": "Фрукты",
+      "type": "products",
+      "parentId": null,
+      "imageUrl": "https://…",
+      "sortOrder": 1
+    },
+    {
+      "id": "c_veg",
+      "name": "Овощи",
+      "type": "products",
+      "parentId": null,
+      "imageUrl": "https://…",
+      "sortOrder": 2
+    },
+    {
+      "id": "c_sets",
+      "name": "Наборы",
+      "type": "sets",
+      "parentId": null,
+      "imageUrl": "https://…",
+      "sortOrder": 3
+    }
+  ],
+  "products": [
+    {
+      "id": "p_apple_gold",
+      "name": "Яблоки",
+      "variety": "Голден",
+      "categoryIds": [
+        "c_fruit"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_apple_gold_v1.jpg",
+      "unit": "kg",
+      "unitTitle": "кг",
+      "price": 105,
+      "oldPrice": 120,
+      "step": 500,
+      "max": 10000,
+      "approxPiecesPerKg": 5,
+      "weight": null,
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": "p_apple_box",
+      "searchWords": [
+        "яблоки"
+      ]
+    },
+    {
+      "id": "p_apple_box",
+      "name": "Яблоки",
+      "variety": "Голден",
+      "categoryIds": [
+        "c_fruit"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_apple_box_v1.jpg",
+      "unit": "box",
+      "unitTitle": "ящик",
+      "price": 900,
+      "oldPrice": null,
+      "step": 1,
+      "max": 5,
+      "approxPiecesPerKg": null,
+      "weight": {
+        "type": "approx",
+        "grams": 10000
+      },
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "яблоки"
+      ]
+    },
+    {
+      "id": "p_carrot",
+      "name": "Морковь",
+      "variety": null,
+      "categoryIds": [
+        "c_veg"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_carrot_v1.jpg",
+      "unit": "kg",
+      "unitTitle": "кг",
+      "price": 37,
+      "oldPrice": null,
+      "step": 500,
+      "max": 10000,
+      "approxPiecesPerKg": null,
+      "weight": null,
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "морковь"
+      ]
+    },
+    {
+      "id": "p_raspberry",
+      "name": "Малина",
+      "variety": null,
+      "categoryIds": [
+        "c_fruit"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_raspberry_v1.jpg",
+      "unit": "tray",
+      "unitTitle": "лоток",
+      "price": 160,
+      "oldPrice": null,
+      "step": 1,
+      "max": 20,
+      "approxPiecesPerKg": null,
+      "weight": {
+        "type": "approx",
+        "grams": 250
+      },
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "малина"
+      ]
+    },
+    {
+      "id": "p_strawberry",
+      "name": "Клубника",
+      "variety": null,
+      "categoryIds": [
+        "c_fruit"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_strawberry_v1.jpg",
+      "unit": "tray",
+      "unitTitle": "лоток",
+      "price": 200,
+      "oldPrice": null,
+      "step": 1,
+      "max": 20,
+      "approxPiecesPerKg": null,
+      "weight": {
+        "type": "approx",
+        "grams": 250
+      },
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "клубника"
+      ]
+    },
+    {
+      "id": "p_melon",
+      "name": "Дыня",
+      "variety": null,
+      "categoryIds": [
+        "c_fruit"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_melon_v1.jpg",
+      "unit": "piece",
+      "unitTitle": "шт",
+      "price": 180,
+      "oldPrice": null,
+      "step": 1,
+      "max": 5,
+      "approxPiecesPerKg": null,
+      "weight": {
+        "type": "min",
+        "grams": 3000
+      },
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "дыня"
+      ]
+    },
+    {
+      "id": "p_melon_torpeda",
+      "name": "Дыня",
+      "variety": "Торпеда",
+      "categoryIds": [
+        "c_fruit"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_melon_torpeda_v1.jpg",
+      "unit": "piece",
+      "unitTitle": "шт",
+      "price": 150,
+      "oldPrice": null,
+      "step": 1,
+      "max": 5,
+      "approxPiecesPerKg": null,
+      "weight": {
+        "type": "min",
+        "grams": 2500
+      },
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "дыня"
+      ]
+    },
+    {
+      "id": "p_potato",
+      "name": "Картофель",
+      "variety": null,
+      "categoryIds": [
+        "c_veg"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_potato_v1.jpg",
+      "unit": "kg",
+      "unitTitle": "кг",
+      "price": 38,
+      "oldPrice": null,
+      "step": 500,
+      "max": 20000,
+      "approxPiecesPerKg": null,
+      "weight": null,
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": "p_potato_bag",
+      "searchWords": [
+        "картофель"
+      ]
+    },
+    {
+      "id": "p_potato_bag",
+      "name": "Картофель",
+      "variety": null,
+      "categoryIds": [
+        "c_veg"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_potato_bag_v1.jpg",
+      "unit": "bag",
+      "unitTitle": "мешок",
+      "price": 320,
+      "oldPrice": null,
+      "step": 1,
+      "max": 5,
+      "approxPiecesPerKg": null,
+      "weight": {
+        "type": "approx",
+        "grams": 10000
+      },
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "картофель"
+      ]
+    },
+    {
+      "id": "p_plum",
+      "name": "Слива",
+      "variety": null,
+      "categoryIds": [
+        "c_fruit"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_plum_v1.jpg",
+      "unit": "kg",
+      "unitTitle": "кг",
+      "price": 105,
+      "oldPrice": null,
+      "step": 500,
+      "max": 10000,
+      "approxPiecesPerKg": null,
+      "weight": null,
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "слива"
+      ]
+    },
+    {
+      "id": "p_alycha",
+      "name": "Алыча",
+      "variety": null,
+      "categoryIds": [
+        "c_fruit"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_alycha_v1.jpg",
+      "unit": "kg",
+      "unitTitle": "кг",
+      "price": 90,
+      "oldPrice": null,
+      "step": 500,
+      "max": 10000,
+      "approxPiecesPerKg": null,
+      "weight": null,
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "алыча"
+      ]
+    },
+    {
+      "id": "p_beet",
+      "name": "Свёкла",
+      "variety": null,
+      "categoryIds": [
+        "c_veg"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_beet_v1.jpg",
+      "unit": "kg",
+      "unitTitle": "кг",
+      "price": 40,
+      "oldPrice": null,
+      "step": 500,
+      "max": 10000,
+      "approxPiecesPerKg": null,
+      "weight": null,
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "свёкла"
+      ]
+    },
+    {
+      "id": "p_cabbage",
+      "name": "Капуста",
+      "variety": null,
+      "categoryIds": [
+        "c_veg"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_cabbage_v1.jpg",
+      "unit": "piece",
+      "unitTitle": "кочан",
+      "price": 60,
+      "oldPrice": null,
+      "step": 1,
+      "max": 10,
+      "approxPiecesPerKg": null,
+      "weight": {
+        "type": "approx",
+        "grams": 2000
+      },
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "капуста"
+      ]
+    },
+    {
+      "id": "p_dill",
+      "name": "Укроп",
+      "variety": null,
+      "categoryIds": [
+        "c_greens"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_dill_v1.jpg",
+      "unit": "bunch",
+      "unitTitle": "пучок",
+      "price": 30,
+      "oldPrice": null,
+      "step": 1,
+      "max": 10,
+      "approxPiecesPerKg": null,
+      "weight": null,
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "укроп"
+      ]
+    },
+    {
+      "id": "p_honey",
+      "name": "Мёд",
+      "variety": null,
+      "categoryIds": [
+        "c_other"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_honey_v1.jpg",
+      "unit": "piece",
+      "unitTitle": "шт",
+      "price": 100,
+      "oldPrice": null,
+      "step": 1,
+      "max": 100,
+      "approxPiecesPerKg": null,
+      "weight": null,
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "мёд"
+      ]
+    },
+    {
+      "id": "p_tomato",
+      "name": "Помидоры",
+      "variety": "розовые",
+      "categoryIds": [
+        "c_veg"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_tomato_v1.jpg",
+      "unit": "kg",
+      "unitTitle": "кг",
+      "price": 120,
+      "oldPrice": null,
+      "step": 500,
+      "max": 10000,
+      "approxPiecesPerKg": null,
+      "weight": null,
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "помидоры"
+      ]
+    },
+    {
+      "id": "p_grape",
+      "name": "Виноград",
+      "variety": null,
+      "categoryIds": [
+        "c_fruit"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_grape_v1.jpg",
+      "unit": "kg",
+      "unitTitle": "кг",
+      "price": 150,
+      "oldPrice": null,
+      "step": 500,
+      "max": 10000,
+      "approxPiecesPerKg": null,
+      "weight": null,
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "виноград"
+      ]
+    },
+    {
+      "id": "p_pear",
+      "name": "Груши",
+      "variety": null,
+      "categoryIds": [
+        "c_fruit"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_pear_v1.jpg",
+      "unit": "kg",
+      "unitTitle": "кг",
+      "price": 110,
+      "oldPrice": null,
+      "step": 500,
+      "max": 10000,
+      "approxPiecesPerKg": null,
+      "weight": null,
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "груши"
+      ]
+    },
+    {
+      "id": "p_onion",
+      "name": "Лук",
+      "variety": null,
+      "categoryIds": [
+        "c_veg"
+      ],
+      "sortOrder": 10,
+      "imageUrl": "https://img.example/p_onion_v1.jpg",
+      "unit": "kg",
+      "unitTitle": "кг",
+      "price": 30,
+      "oldPrice": null,
+      "step": 500,
+      "max": 10000,
+      "approxPiecesPerKg": null,
+      "weight": null,
+      "season": false,
+      "badges": [],
+      "available": true,
+      "closedOn": [],
+      "boxProductId": null,
+      "searchWords": [
+        "лук"
+      ]
+    }
+  ],
+  "sets": [
+    {
+      "id": "s_borsch",
+      "name": "Для борща",
+      "purpose": "…",
+      "imageUrl": "https://img.example/s_borsch.jpg",
+      "items": [
+        {
+          "productId": "p_beet",
+          "quantity": 500
+        },
+        {
+          "productId": "p_cabbage",
+          "quantity": 1
+        },
+        {
+          "productId": "p_dill",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "s_apples",
+      "name": "Яблочный",
+      "purpose": "…",
+      "imageUrl": "https://img.example/s_apples.jpg",
+      "items": [
+        {
+          "productId": "p_apple_gold",
+          "quantity": 2000
+        }
+      ]
+    },
+    {
+      "id": "s_plov",
+      "name": "Для плова",
+      "purpose": null,
+      "imageUrl": "https://img.example/s_plov.jpg",
+      "items": [
+        {
+          "productId": "p_carrot",
+          "quantity": 1000
+        },
+        {
+          "productId": "p_onion",
+          "quantity": 1000
+        }
+      ]
+    }
+  ]
+}
+$catalog$::jsonb
 WHERE kind = 'singleton' AND id = 'catalog' AND (
-    storefront_content.payload->'products' = '[]'::jsonb
-    OR storefront_content.payload = catalog.payload
+    payload->'products' = '[]'::jsonb
+    OR payload #>> '{products,0,id}' = 'p_demo_apple'
 );
 
 WITH delivery AS (
@@ -48,18 +613,15 @@ UPDATE storefront_content SET payload = jsonb_build_object(
         'date', day, 'opensAt', NULL,
         'acceptUntil', to_char(day - 1, 'YYYY-MM-DD') || 'T20:00:00+06:00',
         'windows', '[
-            {"id":"w_day","from":"12:00","to":"16:00"},
-            {"id":"w_evening","from":"17:00","to":"21:00"}
+            {"id":"w12","from":"12:00","to":"16:00"},
+            {"id":"w17","from":"17:00","to":"21:00"}
         ]'::jsonb) ORDER BY day) FROM delivery))
-WHERE kind = 'singleton' AND id = 'schedule' AND payload->'days' = '[]'::jsonb;
+WHERE kind = 'singleton' AND id = 'schedule' AND (
+    payload->'days' = '[]'::jsonb
+    OR payload #>> '{days,0,windows,0,id}' = 'w_day'
+);
 
-INSERT INTO storefront_content (kind, id, published_at, payload)
-VALUES ('news', 'nw_demo_persimmon', now(), jsonb_build_object(
-    'id', 'nw_demo_persimmon', 'type', 'promo', 'title', 'Хурма Королёк со скидкой',
-    'subtitle', '160 сом за килограмм', 'imageUrl', NULL,
-    'publishedAt', to_char(now() AT TIME ZONE 'Asia/Bishkek', 'YYYY-MM-DD"T"HH24:MI:SS') || '+06:00',
-    'blocks', '[{"type":"p","text":"Хурма Королёк в демонстрационной витрине Fruit."}]'::jsonb,
-    'action', '{"type":"product","id":"p_demo_persimmon"}'::jsonb))
-ON CONFLICT (kind, id) DO NOTHING;
 
+-- The reference model has no news fixture.
+DELETE FROM storefront_content WHERE kind = 'news' AND id = 'nw_demo_persimmon';
 COMMIT;
