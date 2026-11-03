@@ -21,6 +21,14 @@ builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+if (!string.IsNullOrWhiteSpace(app.Configuration["Firebase:BroadcastTopic"]) &&
+    !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS")))
+{
+    FirebaseAdmin.FirebaseApp.Create(new FirebaseAdmin.AppOptions
+    {
+        Credential = Google.Apis.Auth.OAuth2.GoogleCredential.GetApplicationDefault()
+    });
+}
 app.Use(async (context, next) =>
 {
     if (context.Request.Path.StartsWithSegments("/admin"))
@@ -61,6 +69,7 @@ app.MapScalarApiReference();
 app.MapGet("/admin", () => Results.Redirect("/admin/index.html"));
 app.MapControllers();
 await app.RunAsync();
+
 
 
 

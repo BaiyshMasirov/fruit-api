@@ -70,6 +70,30 @@ public sealed class AdminController(FruitDb db, IDistributedCache cache, IConfig
         return NoContent();
     }
 
+    [HttpPost("broadcast")]
+    public async Task<IActionResult> Broadcast(BroadcastInput input, CancellationToken token)
+    {
+        if (!Authorized()) return Unauthorized();
+        if (string.IsNullOrWhiteSpace(input.Title) || input.Title.Length > 80 ||
+            string.IsNullOrWhiteSpace(input.Body) || input.Body.Length > 300)
+            return BadRequest("Укажите заголовок до 80 и текст до 300 символов.");
+
+        var firebase = FirebaseAdmin.FirebaseApp.DefaultInstance;
+        var topic = config["Firebase:BroadcastTopic"];
+        if (firebase is null || string.IsNullOrWhiteSpace(topic))
+            return StatusCode(503, "Рассылка недоступна. Настройте Firebase и тему подписки приложения.");
+
+        var messageId = await FirebaseAdmin.Messaging.FirebaseMessaging.GetMessaging(firebase).SendAsync(
+            new FirebaseAdmin.Messaging.Message
+            {
+                Topic = topic,
+                Notification = new FirebaseAdmin.Messaging.Notification { Title = input.Title, Body = input.Body }
+            }, token);
+        return Ok(new { messageId });
+    }
+
+    public sealed record BroadcastInput(string Title, string Body);
+
     private bool Authorized()
     {
         var password = config["Admin:Password"];
@@ -83,4 +107,5 @@ public sealed class AdminController(FruitDb db, IDistributedCache cache, IConfig
             Encoding.UTF8.GetBytes(auth.Parameter ?? ""), Encoding.UTF8.GetBytes(expected));
     }
 }
+
 
