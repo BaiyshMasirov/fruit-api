@@ -17,16 +17,63 @@ table{width:100%;border-collapse:collapse;text-align:left}th,td{padding:.7rem;bo
 .fields label{display:grid;flex:1 1 12rem}.fields input,.fields select{min-width:0}
 dialog{width:min(40rem,85vw);margin:auto}dialog::backdrop{background:#172b2277}
 .scroll{overflow:auto}
+:root{color-scheme:light;font-family:system-ui,sans-serif}
+body{max-width:none;margin:0;padding:0;background:#f3f6fb;color:#182438}
+#loginView{max-width:29rem;margin:12vh auto;padding:0 1rem}
+#login label{display:grid;margin-bottom:.8rem}
+#workspace{display:grid;grid-template-columns:15rem minmax(0,1fr);min-height:100vh}
+aside{background:#152237;color:#e4edf8;padding:1.25rem .85rem;display:flex;flex-direction:column;gap:1.2rem}
+.brand{padding:.5rem .65rem;font-weight:750;font-size:1.35rem}
+.brand small{display:block;color:#9eb3cd;font-weight:500;font-size:.76rem}
+nav{display:grid;gap:.2rem}
+nav p{margin:1rem .65rem .25rem;color:#9eb3cd;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em}
+nav button,#signOut{border:0;background:transparent;color:inherit;text-align:left;padding:.65rem .75rem;margin:0}
+nav button:hover,nav button[aria-current]{background:#2b4160;color:white}
+#signOut{margin-top:auto}
+main{padding:1.75rem;min-width:0}
+.page-header{border-bottom:1px solid #dce5f0;padding-bottom:.8rem}
+.page-header small{color:#526681}
+.page-header h1{margin:.25rem 0}
+section,fieldset,dialog,#login{border-color:#dce5f0;box-shadow:0 4px 16px #233c5e08}
+.primary{background:#285dc1;border-color:#285dc1}
+#message{margin:0 auto;padding:.5rem 1.75rem;color:#334d70}
+@media(max-width:720px){#workspace{grid-template-columns:1fr}aside{gap:.5rem}nav{grid-template-columns:repeat(auto-fit,minmax(8rem,1fr))}nav p{grid-column:1/-1}main{padding:1rem}}
 </style>
-<h1>Fruit · Управление витриной</h1>
+<div id="loginView"><h1>Fruit Admin</h1><p>Управление магазином и доставкой</p>
 <form id="login">
 <label>Логин <input id="username" autocomplete="username" value="admin" required></label>
 <label>Пароль <input id="password" type="password" autocomplete="current-password" required></label>
 <button>Войти</button>
 </form>
 <p id="message" role="status"></p>
+</div>
+<div id="workspace" hidden>
+<aside>
+<div class="brand">Fruit Admin<small>Магазин и доставка</small></div>
+<nav aria-label="Разделы админки">
+<p>Витрина</p>
+<button data-view="products">Товары</button>
+<button data-view="categories">Категории</button>
+<button data-view="sets">Наборы</button>
+<button data-view="news">Новости</button>
+<p>Операции</p>
+<button data-view="orders">Заказы</button>
+<button data-view="deliveries">Доставки</button>
+<button data-view="couriers">Курьеры</button>
+<button data-view="users">Пользователи</button>
+<button data-view="payments">Оплаты</button>
+<button data-view="claims">Жалобы</button>
+<p>Управление</p>
+<button data-view="schedule">Расписание</button>
+<button data-view="editor">Настройки</button>
+</nav>
+<button id="signOut">Выйти</button>
+</aside>
+<main>
+<header class="page-header"><small>Рабочее пространство</small><h1 id="pageTitle">Товары</h1></header>
+<section id="sectionView" hidden><p id="sectionNote"></p><ul id="sectionItems"></ul></section>
 <section id="products" hidden>
-<div class="toolbar"><h2>Товары</h2><input id="search" placeholder="Поиск по названию" aria-label="Поиск товаров"><button id="addProduct" class="primary">+ Добавить товар</button><button id="settings">Другие разделы</button><button id="signOut">Выйти</button></div>
+<div class="toolbar"><input id="search" placeholder="Поиск по названию" aria-label="Поиск товаров"><button id="addProduct" class="primary">+ Добавить товар</button></div>
 <div class="scroll"><table><thead><tr><th>Название</th><th>Категория</th><th>Цена</th><th>Наличие</th><th></th></tr></thead><tbody id="productRows"></tbody></table></div>
 </section>
 <dialog id="productDialog">
@@ -62,6 +109,8 @@ dialog{width:min(40rem,85vw);margin:auto}dialog::backdrop{background:#172b2277}
 <button id="save">Сохранить</button>
 <button id="remove">Удалить новость или текст</button>
 </fieldset>
+</main>
+</div>
 <script>
 const get = id => document.getElementById(id);
 let authorization = '', records = [];
@@ -93,8 +142,9 @@ get('login').onsubmit = async event => {
         authorization = 'Basic ' + btoa(get('username').value + ':' + get('password').value);
         await load('singleton/catalog');
         get('password').value = '';
-        get('login').hidden = true;
-        get('products').hidden = false;
+        get('loginView').hidden = true;
+        get('workspace').hidden = false;
+        openSection('products');
         renderProducts();
         show('');
     } catch (error) { authorization = ''; show(error.message); }
@@ -193,7 +243,37 @@ get('cancelProduct').onclick = () => get('productDialog').close();
 get('addProduct').onclick = () => openProduct();
 get('search').oninput = renderProducts;
 get('signOut').onclick = () => location.reload();
-get('settings').onclick = () => { get('editor').hidden = !get('editor').hidden; };
+const navigation = Array.from(document.querySelectorAll('[data-view]'));
+function openSection(view) {
+    const active = navigation.find(button => button.dataset.view === view);
+    for (const button of navigation) {
+        button.removeAttribute('aria-current');
+    }
+    active.setAttribute('aria-current', 'page');
+    get('pageTitle').textContent = active.textContent;
+    get('products').hidden = view !== 'products';
+    get('editor').hidden = view !== 'editor';
+    get('sectionView').hidden = ['products', 'editor'].includes(view);
+    const schedule = records.find(row => row.kind === 'singleton' && row.id === 'schedule')?.payload;
+    const lists = {
+        categories: () => catalog().categories.map(item => item.name),
+        sets: () => catalog().sets.map(item => item.name),
+        news: () => records.filter(row => row.kind === 'news').map(row => row.payload.title),
+        schedule: () => (schedule?.days ?? []).map(day => day.date + ' · ' +
+            day.windows.map(window => window.from + '–' + window.to).join(', '))
+    };
+    const list = lists[view];
+    const entries = list?.() ?? [];
+    get('sectionNote').textContent = list
+        ? (entries.length ? 'Данные витрины' : 'Пока нет записей.')
+        : 'Раздел появится после подключения серверного API.';
+    get('sectionItems').replaceChildren(...entries.map(entry => {
+        const item = document.createElement('li');
+        item.textContent = entry;
+        return item;
+    }));
+}
+for (const button of navigation) button.onclick = () => openSection(button.dataset.view);
 async function edit(method) {
     try {
         const kind = get('kind').value;
@@ -210,4 +290,5 @@ get('save').onclick = () => edit('PUT');
 get('remove').onclick = () => edit('DELETE');
 </script>
 </html>
+
 
